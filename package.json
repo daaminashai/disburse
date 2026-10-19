@@ -1,0 +1,23 @@
+{
+  "name": "disburse",
+  "version": "0.1.0",
+  "description": "MCP server that drafts HCB disbursements, plus a local dashboard where a human approves them before anything is sent.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "bin": {
+    "disburse-mcp": "src/mcp.js"
+  },
+  "scripts": {
+    "login": "node src/login.js",
+    "dashboard": "node src/dashboard.js",
+    "mcp": "node src/mcp.js",
+    "whoami": "node src/login.js --whoami"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.0",
+    "zod": "^3.25.0"
+  }
+}

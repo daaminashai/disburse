@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HCB Disbursements</title>
+<style>
+  :root {
+    --bg: #f9fafc; --surface: #fff; --text: #1f2d3d; --muted: #8492a6; --border: #e0e6ed;
+    --red: #ec3750; --red-ink: #fff; --green: #33d6a6; --green-ink: #0b5e47; --orange: #ff8c37;
+    --blue: #338eda; --row-sel: #fff1f3; --warn-bg: #fff6ec; --err-bg: #fff0f1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17171d; --surface: #222228; --text: #f0f0f5; --muted: #8b8b99; --border: #34343c;
+      --row-sel: #3a2329; --warn-bg: #3a2c1c; --err-bg: #3d1f24; --green-ink: #33d6a6;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 18px 24px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  header h1 { margin: 0; font-size: 18px; font-weight: 700; }
+  header .who { margin-left: auto; color: var(--muted); font-size: 13px; }
+  .logo { width: 28px; height: 28px; border-radius: 7px; background: var(--red); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 13px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 140px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 28px 0 10px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  tr.sel td { background: var(--row-sel); }
+  tbody tr.selectable { cursor: pointer; }
+  td.amt { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; text-align: right; }
+  th.amt { text-align: right; }
+  .org { font-weight: 600; }
+  .sub { color: var(--muted); font-size: 12px; }
+  .note { font-size: 13px; margin-top: 4px; }
+  .warn { background: var(--warn-bg); border-radius: 6px; padding: 4px 8px; font-size: 12px; margin-top: 6px; }
+  .err { background: var(--err-bg); border-radius: 6px; padding: 4px 8px; font-size: 12px; margin-top: 6px; }
+  .arrow { color: var(--muted); padding: 0 4px; }
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .pill.pending { background: color-mix(in srgb, var(--blue) 15%, transparent); color: var(--blue); }
+  .pill.sending { background: color-mix(in srgb, var(--orange) 18%, transparent); color: var(--orange); }
+  .pill.sent { background: color-mix(in srgb, var(--green) 20%, transparent); color: var(--green-ink); }
+  .pill.failed, .pill.unknown { background: color-mix(in srgb, var(--red) 15%, transparent); color: var(--red); }
+  .pill.cancelled { background: var(--border); color: var(--muted); }
+  input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--red); cursor: pointer; }
+  .empty { padding: 36px; text-align: center; color: var(--muted); }
+  .balances { display: flex; flex-wrap: wrap; gap: 10px; }
+  .bal { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; min-width: 200px; }
+  .bal .n { font-weight: 700; font-size: 17px; font-variant-numeric: tabular-nums; }
+  .bal.over { border-color: var(--red); }
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--border); padding: 14px 16px; }
+  .bar .inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .bar .summary { color: var(--muted); }
+  .bar .summary b { color: var(--text); }
+  button { font: inherit; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 9px 16px; cursor: pointer; font-weight: 600; }
+  button.primary { background: var(--red); border-color: var(--red); color: var(--red-ink); margin-left: auto; padding: 11px 22px; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.link { border: 0; background: none; padding: 0; color: var(--blue); font-weight: 500; font-size: 12px; }
+  .toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 8px; max-width: min(640px, calc(100% - 32px)); display: none; z-index: 5; }
+  .toast.show { display: block; }
+  a { color: var(--blue); }
+  @media (max-width: 640px) {
+    .hide-sm { display: none; }
+    header { padding: 14px 16px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">HCB</div>
+  <h1>Disbursement approvals</h1>
+  <div class="who" id="who">…</div>
+</header>
+<div class="toast" id="toast"></div>
+<main>
+  <h2>Source balances</h2>
+  <div class="balances" id="balances"><div class="sub">Loading…</div></div>
+
+  <h2>Awaiting approval</h2>
+  <div class="card">
+    <table>
+      <thead><tr>
+        <th style="width:36px"><input type="checkbox" id="all" aria-label="Select all"></th>
+        <th>Transfer</th><th class="hide-sm">Reason</th><th class="amt">Amount</th><th>Status</th><th></th>
+      </tr></thead>
+      <tbody id="queue"></tbody>
+    </table>
+  </div>
+
+  <h2>History</h2>
+  <div class="card">
+    <table>
+      <thead><tr><th>Transfer</th><th class="hide-sm">Reason</th><th class="amt">Amount</th><th>Status</th><th class="hide-sm">When</th></tr></thead>
+      <tbody id="history"></tbody>
+    </table>
+  </div>
+</main>
+
+<div class="bar">
+  <div class="inner">
+    <button id="cancelBtn" disabled>Cancel selected</button>
+    <span class="summary" id="summary">Select drafts to approve.</span>
+    <button class="primary" id="approveBtn" disabled>Approve</button>
+  </div>
+</div>
+
+<script>
+const CSRF = "__CSRF__";
+const HCB = "__HCB_BASE__";
+const $ = (id) => document.getElementById(id);
+const usd = (c) => "$" + (c / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const when = (iso) => new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+
+let drafts = [];
+let bal = {};
+let selected = new Set();
+let busy = false;
+
+async function call(path, body) {
+  const r = await fetch(path, {
+    method: body ? "POST" : "GET",
+    headers: { "x-csrf": CSRF, ...(body ? { "Content-Type": "application/json" } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
+}
+
+function toast(msg, ms = 6000) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toast.h);
+  toast.h = setTimeout(() => t.classList.remove("show"), ms);
+}
+
+const approvable = (d) => d.status === "pending" || d.status === "failed";
+const orgLink = (name, id, slug) =>
+  slug ? `<a href="${esc(HCB)}/${esc(slug)}" target="_blank" rel="noopener">${esc(name || id)}</a>` : esc(name || id);
+
+function transferCell(d) {
+  return `<div><span class="org">${orgLink(d.from_org_name, d.from_org_id, d.from_org_slug)}</span><span class="arrow">→</span><span class="org">${orgLink(d.to_org_name, d.to_org_id, d.to_org_slug)}</span></div>
+    <div class="sub">${esc(d.id)} · drafted ${when(d.created_at)}</div>`;
+}
+
+function reasonCell(d) {
+  let h = `<div>${esc(d.name)}</div>`;
+  if (d.rationale) h += `<div class="note sub">Agent's note: ${esc(d.rationale)}</div>`;
+  if (d.warning && approvable(d)) h += `<div class="warn">⚠ ${esc(d.warning)}</div>`;
+  if (d.error) h += `<div class="err">${esc(d.error)}</div>`;
+  return h;
+}
+
+function render() {
+  const queue = drafts.filter((d) => approvable(d) || d.status === "sending" || d.status === "unknown");
+  const history = drafts.filter((d) => !queue.includes(d));
+  for (const id of [...selected]) if (!drafts.some((d) => d.id === id && approvable(d))) selected.delete(id);
+
+  $("queue").innerHTML = queue.length
+    ? queue.map((d) => {
+        const can = approvable(d);
+        const sel = selected.has(d.id);
+        let actions = "";
+        if (d.status === "unknown") {
+          actions = `<div class="sub">Check HCB, then:</div>
+            <button class="link" data-resolve="sent" data-id="${d.id}">It went through</button> ·
+            <button class="link" data-resolve="failed" data-id="${d.id}">It didn't</button>`;
+        }
+        return `<tr class="${can ? "selectable" : ""} ${sel ? "sel" : ""}" data-id="${d.id}">
+          <td>${can ? `<input type="checkbox" data-id="${d.id}" ${sel ? "checked" : ""} ${busy ? "disabled" : ""} aria-label="Select ${esc(d.id)}">` : ""}</td>
+          <td>${transferCell(d)}</td>
+          <td class="hide-sm">${reasonCell(d)}</td>
+          <td class="amt">${usd(d.amount_cents)}</td>
+          <td><span class="pill ${d.status}">${d.status === "failed" ? "failed — retry?" : d.status}</span></td>
+          <td>${actions}</td>
+        </tr>`;
+      }).join("")
+    : `<tr><td colspan="6" class="empty">No drafts waiting. Ask your agent to draft some disbursements.</td></tr>`;
+
+  $("history").innerHTML = history.length
+    ? history.map((d) => `<tr>
+        <td>${transferCell(d)}</td>
+        <td class="hide-sm">${reasonCell(d)}${d.hcb_transfer_id ? `<div class="sub">HCB ${esc(d.hcb_transfer_id)}${d.hcb_status ? " · " + esc(d.hcb_status) : ""}</div>` : ""}</td>
+        <td class="amt">${usd(d.amount_cents)}</td>
+        <td><span class="pill ${d.status}">${d.status}</span></td>
+        <td class="hide-sm sub">${when(d.updated_at)}</td>
+      </tr>`).join("")
+    : `<tr><td colspan="5" class="empty">Nothing sent yet.</td></tr>`;
+
+  // Balances, with what's selected against each source.
+  const bySource = {};
+  for (const d of drafts.filter(approvable)) {
+    bySource[d.from_org_id] ??= { name: d.from_org_name || d.from_org_id, sel: 0, queued: 0 };
+    bySource[d.from_org_id].queued += d.amount_cents;
+    if (selected.has(d.id)) bySource[d.from_org_id].sel += d.amount_cents;
+  }
+  const srcs = Object.entries(bySource);
+  $("balances").innerHTML = srcs.length
+    ? srcs.map(([id, s]) => {
+        const b = bal[id];
+        const avail = b?.balance_cents;
+        const over = avail != null && s.sel > avail;
+        return `<div class="bal ${over ? "over" : ""}">
+          <div class="sub">${esc(s.name)}</div>
+          <div class="n">${b?.error ? "—" : avail == null ? "…" : usd(avail)}</div>
+          <div class="sub">${s.sel ? `${usd(s.sel)} selected` : `${usd(s.queued)} drafted`}${over ? ` · <b style="color:var(--red)">exceeds balance</b>` : ""}</div>
+          ${b?.error ? `<div class="err">${esc(b.error)}</div>` : ""}
+        </div>`;
+      }).join("")
+    : `<div class="sub">No pending drafts.</div>`;
+
+  const selDrafts = drafts.filter((d) => selected.has(d.id));
+  const total = selDrafts.reduce((a, d) => a + d.amount_cents, 0);
+  const allApprovable = queue.filter(approvable);
+  $("all").checked = allApprovable.length > 0 && allApprovable.every((d) => selected.has(d.id));
+  $("all").disabled = busy || allApprovable.length === 0;
+  $("approveBtn").disabled = busy || selDrafts.length === 0;
+  $("cancelBtn").disabled = busy || selDrafts.length === 0;
+  $("approveBtn").textContent = busy
+    ? "Sending…"
+    : selDrafts.length
+      ? `Approve & send ${selDrafts.length} · ${usd(total)}`
+      : "Approve";
+  $("summary").innerHTML = selDrafts.length
+    ? `<b>${selDrafts.length}</b> selected · <b>${usd(total)}</b> total`
+    : "Select drafts to approve.";
+}
+
+async function refresh() {
+  try {
+    drafts = (await call("/api/drafts")).drafts;
+    render();
+    if (drafts.some((d) => approvable(d) && !(d.from_org_id in bal))) refreshBalances();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+async function refreshBalances() {
+  try {
+    bal = await call("/api/balances");
+    render();
+  } catch (e) {
+    toast("Couldn't load balances: " + e.message);
+  }
+}
+
+document.addEventListener("click", async (e) => {
+  const t = e.target;
+  if (t.matches("[data-resolve]")) {
+    try {
+      await call("/api/resolve", { id: t.dataset.id, outcome: t.dataset.resolve });
+      await refresh();
+    } catch (err) { toast(err.message); }
+    return;
+  }
+  if (busy || t.closest("a, button")) return;
+  const row = t.closest("tr.selectable");
+  if (!row) return;
+  const id = row.dataset.id;
+  selected.has(id) ? selected.delete(id) : selected.add(id);
+  render();
+});
+
+$("all").addEventListener("change", (e) => {
+  const ids = drafts.filter(approvable).map((d) => d.id);
+  selected = e.target.checked ? new Set(ids) : new Set();
+  render();
+});
+
+$("approveBtn").addEventListener("click", async () => {
+  const ids = [...selected];
+  if (!ids.length) return;
+  busy = true;
+  render();
+  try {
+    const { results } = await call("/api/approve", { ids });
+    const sent = results.filter((r) => r.status === "sent").length;
+    const bad = results.filter((r) => r.status === "failed" || r.status === "unknown");
+    selected.clear();
+    toast(bad.length
+      ? `Sent ${sent}. ${bad.length} didn't go through — see the queue for details.`
+      : `Sent ${sent} transfer${sent === 1 ? "" : "s"} on HCB.`);
+  } catch (err) {
+    toast(err.message, 10000);
+  } finally {
+    busy = false;
+    await refresh();
+    refreshBalances();
+  }
+});
+
+$("cancelBtn").addEventListener("click", async () => {
+  const ids = [...selected];
+  try {
+    const { cancelled } = await call("/api/cancel", { ids });
+    selected.clear();
+    toast(`Cancelled ${cancelled.length} draft${cancelled.length === 1 ? "" : "s"}.`);
+    refresh();
+  } catch (err) { toast(err.message); }
+});
+
+call("/api/me").then((me) => ($("who").textContent = `Signed in as ${me.name}`)).catch((e) => ($("who").textContent = e.message));
+refresh().then(refreshBalances);
+setInterval(() => { if (!busy) refresh(); }, 4000);
+setInterval(() => { if (!busy) refreshBalances(); }, 60000);
+</script>
+</body>
+</html>
